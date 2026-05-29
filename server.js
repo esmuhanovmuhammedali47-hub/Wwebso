@@ -2,14 +2,48 @@ const WebSocket = require("ws");
 
 const port = process.env.PORT || 10000;
 
+const FIREBASE_BASE =
+  "https://trictracaj-default-rtdb.firebaseio.com";
+
 const FIREBASE_URL =
-  "https://trictracaj-default-rtdb.firebaseio.com/logs.json";
+  `${FIREBASE_BASE}/logs.json`;
 
 const wss = new WebSocket.Server({ port });
 
 const clients = new Set();
 
 console.log("WebSocket server started");
+
+// AUTO CLEAN EVERY 5 MINUTES
+setInterval(async () => {
+    try {
+        console.log("Cleaning old Firebase logs...");
+
+        const res = await fetch(`${FIREBASE_BASE}/logs.json`);
+        const logs = await res.json();
+
+        if (!logs) return;
+
+        const now = Date.now();
+        const maxAge = 5 * 60 * 1000; // 5 minutes
+
+        for (const key in logs) {
+            const log = logs[key];
+
+            if (!log.time || now - log.time > maxAge) {
+
+                await fetch(`${FIREBASE_BASE}/logs/${key}.json`, {
+                    method: "DELETE"
+                });
+
+                console.log("Deleted:", key);
+            }
+        }
+
+    } catch (err) {
+        console.log("Cleanup error:", err);
+    }
+}, 60 * 1000); // checks every minute
 
 wss.on("connection", (ws) => {
     console.log("Client connected");
