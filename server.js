@@ -11,6 +11,7 @@ const FIREBASE_URL =
 const wss = new WebSocket.Server({ port });
 
 const clients = new Set();
+const blacklist = new Set();
 
 console.log("WebSocket server started");
 
@@ -50,6 +51,14 @@ wss.on("connection", (ws) => {
 
     clients.add(ws);
 
+    // Sync current blacklist to newly connected client
+    if (blacklist.size > 0) {
+        ws.send(JSON.stringify({
+            action: "sync_blacklist",
+            blacklist: Array.from(blacklist)
+        }));
+    }
+
     ws.on("message", async (message) => {
         try {
             const text = message.toString();
@@ -62,6 +71,39 @@ wss.on("connection", (ws) => {
                 data = JSON.parse(text);
             } catch {
                 data = { message: text };
+            }
+
+            // Handle blacklist logic
+            if (data.action === "blacklist" && data.jobId) {
+                blacklist.add(data.jobId);
+                console.log(`Server ${data.jobId} blacklisted for 1 minute`);
+
+                // Broadcast blacklist state to all clients
+                for (const client of clients) {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify({
+                            action: "blacklist",
+                            jobId: data.jobId
+                        }));
+                    }
+                }
+
+                // Remove from blacklist after 1 minute (60000 ms)
+                setTimeout(() => {
+                    blacklist.delete(data.jobId);
+                    console.log(`Server ${data.jobId} removed from blacklist`);
+
+                    for (const client of clients) {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                action: "unblacklist",
+                                jobId: data.jobId
+                            }));
+                        }
+                    }
+                }, 60000);
+
+                return;
             }
 
             // save to firebase
