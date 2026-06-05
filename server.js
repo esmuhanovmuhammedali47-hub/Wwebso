@@ -3,7 +3,7 @@ const WebSocket = require("ws");
 const port = process.env.PORT || 10000;
 
 const FIREBASE_BASE =
-  "https://trictracaj-default-rtdb.firebaseio.com";
+  "https://looprix-validation-default-rtdb.firebaseio.com";
 
 const FIREBASE_URL =
   `${FIREBASE_BASE}/logs.json`;
